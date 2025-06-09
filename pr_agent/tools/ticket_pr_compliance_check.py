@@ -1,5 +1,7 @@
 import re
 import traceback
+from typing import List, Optional
+import requests
 
 from pr_agent.config_loader import get_settings
 from pr_agent.git_providers import GithubProvider
@@ -9,6 +11,50 @@ from pr_agent.log import get_logger
 GITHUB_TICKET_PATTERN = re.compile(
      r'(https://github[^/]+/[^/]+/[^/]+/issues/\d+)|(\b(\w+)/(\w+)#(\d+)\b)|(#\d+)'
 )
+
+# Regex to identify Trello card links like https://trello.com/c/<CARD_ID>
+TRELLO_CARD_PATTERN = re.compile(r'https?://trello\.com/c/([A-Za-z0-9]+)')
+
+
+def find_trello_cards(text: str) -> List[str]:
+    """Extract Trello card short IDs from the given text."""
+    if not text:
+        return []
+    return list({match for match in TRELLO_CARD_PATTERN.findall(text)})
+
+
+def find_trello_card_from_branch(branch: str) -> Optional[str]:
+    """Attempt to derive Trello card ID from branch name."""
+    if not branch:
+        return None
+    for seg in re.split(r'[/-]', branch):
+        if len(seg) == 8 and seg.isalnum():
+            return seg
+    return None
+
+
+def fetch_trello_card(card_id: str) -> Optional[dict]:
+    """Fetch Trello card details using the API if credentials are configured."""
+    api_key = get_settings().get('trello.api_key', None)
+    token = get_settings().get('trello.api_token', None)
+    if not api_key or not token:
+        get_logger().debug('Trello credentials missing, skipping fetch')
+        return None
+    url = f'https://api.trello.com/1/cards/{card_id}'
+    try:
+        resp = requests.get(url, params={'key': api_key, 'token': token}, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return {
+                'ticket_id': card_id,
+                'ticket_url': f'https://trello.com/c/{card_id}',
+                'title': data.get('name', ''),
+                'body': data.get('desc', '')
+            }
+        get_logger().warning(f'Failed to fetch Trello card {card_id}: {resp.status_code}')
+    except Exception as e:
+        get_logger().error(f'Error fetching Trello card {card_id}: {e}')
+    return None
 
 def find_jira_tickets(text):
     # Regular expression patterns for JIRA tickets
@@ -69,6 +115,11 @@ async def extract_tickets(git_provider):
         if isinstance(git_provider, GithubProvider):
             user_description = git_provider.get_user_description()
             tickets = extract_ticket_links_from_pr_description(user_description, git_provider.repo, git_provider.base_url_html)
+            trello_cards = find_trello_cards(user_description)
+            branch_card = find_trello_card_from_branch(git_provider.get_pr_branch())
+            if branch_card:
+                trello_cards.append(branch_card)
+            trello_cards = list(set(trello_cards))
             tickets_content = []
 
             if tickets:
@@ -129,7 +180,14 @@ async def extract_tickets(git_provider):
                         'sub_issues': sub_issues_content  # Store sub-issues content
                     })
 
-                return tickets_content
+
+        # process Trello cards
+        for card_id in trello_cards:
+            card_details = fetch_trello_card(card_id)
+            if card_details:
+                tickets_content.append(card_details)
+
+        return tickets_content
 
     except Exception as e:
         get_logger().error(f"Error extracting tickets error= {e}",
