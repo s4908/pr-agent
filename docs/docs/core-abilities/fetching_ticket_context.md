@@ -12,6 +12,7 @@ This integration enriches the review process by automatically surfacing relevant
 - [GitHub](https://qodo-merge-docs.qodo.ai/core-abilities/fetching_ticket_context/#github-issues-integration)
 - [Jira (💎)](https://qodo-merge-docs.qodo.ai/core-abilities/fetching_ticket_context/#jira-integration)
 - [Linear (💎)](https://qodo-merge-docs.qodo.ai/core-abilities/fetching_ticket_context/#linear-integration)
+- [Trello (💎)](https://qodo-merge-docs.qodo.ai/core-abilities/fetching_ticket_context/#trello-integration)
 
 **Ticket data fetched:**
 
@@ -424,3 +425,29 @@ Name your branch with the ticket ID as a prefix (e.g., `ABC-123-feature-descript
     ```
     
     Replace `[ORG_ID]` with your Linear organization identifier.
+
+## Trello Integration 💎
+
+### Trello App Authentication
+
+The recommended way to authenticate with Trello is to connect the Trello app through the Qodo Merge portal.
+
+Installation steps:
+
+1. Go to the [Qodo Merge integrations page](https://app.qodo.ai/qodo-merge/integrations)
+2. Navigate to the **Integrations** tab
+3. Click on the **Trello** button to connect the Trello app
+4. Follow the authentication flow to authorize Qodo Merge to access your Trello workspace
+5. Once connected, Qodo Merge will be able to fetch Trello card context for your PRs
+
+### How to link a PR to a Trello card
+
+Qodo Merge will automatically detect Trello cards using either of these methods:
+
+**Method 1: Description Reference:**
+
+Include a card link in your PR description, for example: `https://trello.com/c/<CARD_ID>`
+
+**Method 2: Branch Name Detection:**
+
+Name your branch with the card ID as a prefix (e.g., `CARD_ID-feature-description` or `feature/CARD_ID/feature-description`).
